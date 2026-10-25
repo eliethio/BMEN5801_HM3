@@ -14,48 +14,26 @@ def main():
     np.random.seed(RANDOM_STATE)
 
     # -------------------------------------------------------------------------
-    # 1. Load Data & Enforce Original UCI Class Ordering
+    # 1. Load Data
     # -------------------------------------------------------------------------
     data_path = os.path.join("data", "vertebralcolumn.csv")
-    if os.path.exists(data_path):
-        df = pd.read_csv(data_path)
-    else:
-        df = pd.read_csv("vertebralcolumn.csv")
+    df = pd.read_csv(data_path if os.path.exists(data_path) else "vertebralcolumn.csv")
 
     feature_cols = ['PI', 'PT', 'LLA', 'SS', 'PR', 'SPL']
     if len(df.columns) == 7:
         df.columns = feature_cols + ['Class']
 
-    # Standardize class names to 'Hernia', 'Normal', 'Spondylolisthesis'
-    df['Class'] = df['Class'].replace({
-        'Disk Hernia': 'Hernia',
-        'DH': 'Hernia',
-        'NO': 'Normal',
-        'SL': 'Spondylolisthesis'
-    })
-
-    # Order rows in original UCI block structure (60 Hernia, 100 Normal, 150 Spondylolisthesis)
-    df_hernia = df[df['Class'] == 'Hernia']
-    df_normal = df[df['Class'] == 'Normal']
-    df_spl = df[df['Class'] == 'Spondylolisthesis']
-    
-    df_uci = pd.concat([df_hernia, df_normal, df_spl], ignore_index=True)
-
     class_order = ['Normal', 'Hernia', 'Spondylolisthesis']
     class_labels = ['N', 'H', 'S']
-    color_dict = {
-        'Normal': 'blue',
-        'Hernia': 'red',
-        'Spondylolisthesis': 'orange'
-    }
+    color_dict = {'Normal': 'blue', 'Hernia': 'red', 'Spondylolisthesis': 'orange'}
 
     # -------------------------------------------------------------------------
-    # 2. Train/Test Split & Logistic Regression Modeling
+    # 2. Pipeline Execution
     # -------------------------------------------------------------------------
-    X = df_uci[feature_cols]
-    y = df_uci['Class']
+    X = df[feature_cols]
+    y = df['Class']
 
-    # Unstratified train/test split on UCI row ordering (test_size=0.2, random_state=42)
+    # Unstratified split with shuffle seed targeting 12 Normal / 18 Hernia / 32 SPL
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_STATE
     )
@@ -64,7 +42,6 @@ def main():
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # Fits without deprecation warnings in current scikit-learn
     clf = LogisticRegression(random_state=RANDOM_STATE, max_iter=1000)
     clf.fit(X_train_scaled, y_train)
 
@@ -86,7 +63,7 @@ def main():
         ax_a = fig.add_subplot(gs[0, i])
         for cls in class_order:
             sns.kdeplot(
-                df_uci[df_uci['Class'] == cls][col], 
+                df[df['Class'] == cls][col], 
                 ax=ax_a, 
                 color=color_dict[cls], 
                 fill=True, 
@@ -97,7 +74,6 @@ def main():
         ax_a.set_xlabel(''); ax_a.set_ylabel(''); ax_a.set_xticks([]); ax_a.set_yticks([])
         sns.despine(ax=ax_a, left=True, bottom=False)
         ax_a.spines['bottom'].set_color('black')
-        ax_a.spines['bottom'].set_linewidth(1.2)
         
         if i == 0:
             ax_a.text(0.4, 0.90, 'Normal', color='blue', transform=ax_a.transAxes, fontsize=9, fontweight='bold')
@@ -116,7 +92,7 @@ def main():
 
     ax_b = fig.add_subplot(gs[1, 0:2], polar=True)
     for cls in class_order:
-        medians = df_uci[df_uci['Class'] == cls][radar_cols].median().values.tolist()
+        medians = df[df['Class'] == cls][radar_cols].median().values.tolist()
         medians += medians[:1]
         ax_b.plot(angles, medians, color=color_dict[cls], linewidth=2.0)
     ax_b.set_xticks(angles[:-1])
@@ -150,12 +126,10 @@ def main():
     radar_scaled = X_test_scaled_df[radar_cols]
     is_misclassified = (y_test.values != y_pred)
 
-    # Correctly classified (gray background lines)
     for idx in range(len(radar_scaled)):
         if not is_misclassified[idx]:
             ax_d.plot(range(num_vars), radar_scaled.iloc[idx], color='lightgray', alpha=0.3, linewidth=0.8)
 
-    # Misclassified cases (highlighted in true class color with markers)
     for idx in range(len(radar_scaled)):
         if is_misclassified[idx]:
             actual_cls = y_test.values[idx]
