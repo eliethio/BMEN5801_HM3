@@ -1,0 +1,5 @@
+Model,Log-Likelihood,AIC,BIC
+Ordinary Least Squares (OLS),-950.1465281781819,1904.2930563563639,1910.6789700581444
+Random Intercept,-893.2325426974755,,
+Random Slope,-883.2625137438799,,
+Random Intercept & Slope,-871.8141359795748,,
